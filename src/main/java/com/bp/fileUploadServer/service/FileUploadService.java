@@ -21,19 +21,19 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FileUploadService {
 
-
     private static final int TOTAL_UPLOAD_RESOURCES = 5;
     private BlockingQueue<FileUploadQueueTask> fileUploadQueue;
     private ExecutorService uploadPool;
+    private ComputingService computingService;
 
+    public FileUploadService(ComputingService computingService) {
 
-    public FileUploadService() {
+        this.computingService = computingService;
+
         uploadPool = Executors.newFixedThreadPool(TOTAL_UPLOAD_RESOURCES);
         final Comparator<FileUploadQueueTask> taskPriority = Comparator.comparing(FileUploadQueueTask::getPriority);
         fileUploadQueue = new PriorityBlockingQueue<>(100, taskPriority);
     }
-
-
 
     public List<String> uploadFiles(List<MultipartFile> files, String user) throws InterruptedException {
 
@@ -57,19 +57,20 @@ public class FileUploadService {
         return filesServerNames;
     }
 
-    public String downloadFile(String filename, String user) {
-
-        return "";
-    }
 
     public List<String> submitForUploadPermission(List<FileMetadata> fileMetadataList) {
+
+        computingService.countUserRequest(fileMetadataList.get(0).getUserName(),fileMetadataList.size());
 
         final List<FileUploadQueueTask> notQueuedTasks = fileUploadQueue
                 .stream()
                 .filter(e -> !fileMetadataList.contains(e.getFileMetadata()))
                 .collect(Collectors.toList());
 
-        notQueuedTasks.forEach(e -> uploadPool.submit(e));
+        notQueuedTasks.forEach(e -> {
+            e.setPriority(computingService.computePriority(e));
+            uploadPool.submit(e);
+        });
 
         return fileUploadQueue
                 .stream()
@@ -101,6 +102,8 @@ public class FileUploadService {
         }
         return "";
     }
+
+
 
 
 }
