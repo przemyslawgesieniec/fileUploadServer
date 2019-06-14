@@ -1,5 +1,6 @@
 package com.bp.fileUploadServer.model;
 
+import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
 import lombok.Getter;
 
 @Getter

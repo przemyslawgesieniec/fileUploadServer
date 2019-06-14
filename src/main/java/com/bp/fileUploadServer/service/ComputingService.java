@@ -1,6 +1,6 @@
 package com.bp.fileUploadServer.service;
 
-import com.bp.fileUploadServer.model.FileUploadQueueTask;
+import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

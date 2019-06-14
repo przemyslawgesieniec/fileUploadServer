@@ -8,6 +8,12 @@ import java.util.Objects;
 public class FileMetadata {
 
     private String fileName;
+
+    public void setServerFileName(String uuid) {
+        this.serverFileName = uuid + fileName;
+    }
+
+    private String serverFileName;
     private String userName;
     private Integer fileSize;
     @Setter

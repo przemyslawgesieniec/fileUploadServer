@@ -1,5 +1,6 @@
-package com.bp.fileUploadServer.model;
+package com.bp.fileUploadServer.model.Task;
 
+import com.bp.fileUploadServer.model.FileMetadata;
 import com.bp.fileUploadServer.service.DiscService;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,7 +25,8 @@ public class FileUploadQueueTask implements Callable<String> {
 
     @Override
     public String call() throws Exception {
-
+        fileMetadata.setServerFileName(taskId);
+        discService.save(fileMetadata);
         return null;
     }
 

@@ -1,7 +1,7 @@
 package com.bp.fileUploadServer.service;
 
 import com.bp.fileUploadServer.model.FileMetadata;
-import com.bp.fileUploadServer.model.FileUploadQueueTask;
+import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
 import com.bp.fileUploadServer.model.SnapshotContent;
 import java.io.IOException;
 import java.time.Instant;
@@ -138,7 +138,7 @@ public class FileUploadService {
         final int freeSnapshotSpace = TOTAL_UPLOAD_RESOURCES - livingQueueSnapshot.size();
         for (int i = 0; i < freeSnapshotSpace; i++) {
             final FileUploadQueueTask uploadTask = fileUploadQueue.poll();
-            final String uploadKey = UUID.randomUUID().toString() + uploadTask.getFileMetadata().getFileName();
+            final String uploadKey = uploadTask.getTaskId() + uploadTask.getFileMetadata().getFileName();
             livingQueueSnapshot.put(uploadKey, new SnapshotContent(uploadTask, Instant.now().getEpochSecond()));
         }
     }
