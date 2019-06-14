@@ -27,7 +27,7 @@ public class FileUploadQueueTask implements Callable<String> {
     public String call() throws Exception {
         fileMetadata.setServerFileName(taskId);
         discService.save(fileMetadata);
-        return null;
+        return fileMetadata.getServerFileName();
     }
 
     @Override

@@ -1,15 +1,14 @@
 package com.bp.fileUploadServer.service;
 
 import com.bp.fileUploadServer.model.FileMetadata;
-import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
 import com.bp.fileUploadServer.model.SnapshotContent;
+import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -26,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileUploadService {
 
     private static final int TOTAL_UPLOAD_RESOURCES = 5;
-    private static final long UPLOAD_QUEUE_TIMEOUT_SECONDS = 120;
+    private static final long UPLOAD_QUEUE_TIMEOUT_SECONDS = 8000; //todo change
     private BlockingQueue<FileUploadQueueTask> fileUploadQueue;
     private Map<String, SnapshotContent> livingQueueSnapshot;
     private ExecutorService uploadPool;
@@ -81,7 +80,7 @@ public class FileUploadService {
                 .filter(task -> task.getValue().getFileUploadQueueTask().getFileMetadata().getUserName().equals(user))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        filteredLivingQueueSnapshot.forEach((k,v) ->{
+        filteredLivingQueueSnapshot.forEach((k, v) -> {
             try {
                 final MultipartFile multipartFile = fileNameWithContent.get(k);
                 v.getFileUploadQueueTask().getFileMetadata().setFileContent(new String(multipartFile.getBytes()));
@@ -95,21 +94,17 @@ public class FileUploadService {
                 .stream()
                 .map(e -> e.getValue().getFileUploadQueueTask())
                 .collect(Collectors.toList());
+        //todo verify, same files send again are not filtered out
 
-        final List<Future<String>> futureFilesServerNames = uploadPool.invokeAll(userTasksToExecute);
-
-        final List<String> uploadedFilesServerNames = futureFilesServerNames
-                .stream()
-                .map(FileUploadService::getFuture)
-                .collect(Collectors.toList());
+        uploadPool.invokeAll(userTasksToExecute);
 
         filteredLivingQueueSnapshot.forEach((key, value) -> {
             livingQueueSnapshot.remove(key);
             System.out.println("UPLOAD - file " + value.getFileUploadQueueTask().getFileMetadata().getFileName()
-                    + " of user " + value.getFileUploadQueueTask().getFileMetadata().getUserName() + "is uploaded");
+                    + " of user " + value.getFileUploadQueueTask().getFileMetadata().getUserName() + " is uploaded");
         });
 
-        return uploadedFilesServerNames;
+        return userTasksToExecute.stream().map(e->e.getFileMetadata().getServerFileName()).collect(Collectors.toList());
     }
 
     private static String getFuture(Future<String> stringFuture) {
@@ -131,16 +126,17 @@ public class FileUploadService {
         return "";
     }
 
-    private void updateLivingSnapshot() {
+    private synchronized void updateLivingSnapshot() {
 
         cleanupLivingSnapshot();
 
-        final int freeSnapshotSpace = TOTAL_UPLOAD_RESOURCES - livingQueueSnapshot.size();
-        for (int i = 0; i < freeSnapshotSpace; i++) {
+        while (livingQueueSnapshot.size() < TOTAL_UPLOAD_RESOURCES) {
+            if (fileUploadQueue.size() == 0) break;
             final FileUploadQueueTask uploadTask = fileUploadQueue.poll();
             final String uploadKey = uploadTask.getTaskId() + uploadTask.getFileMetadata().getFileName();
             livingQueueSnapshot.put(uploadKey, new SnapshotContent(uploadTask, Instant.now().getEpochSecond()));
         }
+
     }
 
     private synchronized void cleanupLivingSnapshot() {

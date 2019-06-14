@@ -24,7 +24,7 @@ public class FileManagementController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity uploadFiles(@RequestParam("file") List<MultipartFile> files, @RequestParam("user") String user, List<String> serverFilesId) throws InterruptedException {
+    public ResponseEntity uploadFiles(@RequestParam("files") List<MultipartFile> files, @RequestParam("user") String user, @RequestParam("serverFilesId") List<String> serverFilesId) throws InterruptedException {
 
         Map<String, MultipartFile> fileMetadataMap = new HashMap<>();
 

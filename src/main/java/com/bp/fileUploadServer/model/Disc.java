@@ -24,9 +24,9 @@ public class Disc {
 
     public Disc(int discNumber) {
         this.discNumber = discNumber;
-        directoryPath = "disc" + discNumber;
+        directoryPath ="src/main/resources/cluster/disc" + discNumber;
         path = directoryPath + "/";
-        csvFilePath = path + "d.csv";
+        csvFilePath = path + "mapper.csv";
     }
 
     public void save(FileMetadata fileMetadata) throws InterruptedException {

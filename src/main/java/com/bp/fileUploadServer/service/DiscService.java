@@ -21,9 +21,12 @@ public class DiscService {
 
     public void save(FileMetadata fileMetadata) throws InterruptedException {
 
+        System.out.println("Disc - saving...");
         final Disc polledDisc = discs.poll();
         polledDisc.save(fileMetadata);
         discs.add(polledDisc);
+        System.out.println("Disc - saved");
+
     }
 
 }
