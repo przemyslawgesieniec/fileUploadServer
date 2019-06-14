@@ -1,16 +1,23 @@
 package com.bp.fileUploadServer.model;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
 import java.util.Objects;
 
-@AllArgsConstructor
 @Getter
 public class FileMetadata {
 
-    String fileName;
-    String userName;
-    Integer fileSize;
+    private String fileName;
+    private String userName;
+    private Integer fileSize;
+    @Setter
+    private String fileContent;
+
+    public FileMetadata(String fileName, String userName, Integer fileSize) {
+        this.fileName = fileName;
+        this.userName = userName;
+        this.fileSize = fileSize;
+    }
 
     @Override
     public boolean equals(Object o) {

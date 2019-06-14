@@ -2,12 +2,16 @@ package com.bp.fileUploadServer.service;
 
 import com.bp.fileUploadServer.model.FileMetadata;
 import com.bp.fileUploadServer.model.FileUploadQueueTask;
+import com.bp.fileUploadServer.model.SnapshotContent;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,66 +26,90 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileUploadService {
 
     private static final int TOTAL_UPLOAD_RESOURCES = 5;
+    private static final long UPLOAD_QUEUE_TIMEOUT_SECONDS = 120;
     private BlockingQueue<FileUploadQueueTask> fileUploadQueue;
+    private Map<String, SnapshotContent> livingQueueSnapshot;
     private ExecutorService uploadPool;
     private ComputingService computingService;
+    private DiscService discService;
 
-    public FileUploadService(ComputingService computingService) {
+    public FileUploadService(ComputingService computingService, DiscService discService) {
 
         this.computingService = computingService;
+        this.discService = discService;
 
         uploadPool = Executors.newFixedThreadPool(TOTAL_UPLOAD_RESOURCES);
+        livingQueueSnapshot = new ConcurrentHashMap<>();
         final Comparator<FileUploadQueueTask> taskPriority = Comparator.comparing(FileUploadQueueTask::getPriority);
         fileUploadQueue = new PriorityBlockingQueue<>(100, taskPriority);
-    }
-
-    public List<String> uploadFiles(List<MultipartFile> files, String user) throws InterruptedException {
-
-        final Map<String, String> filesNames = files.stream().collect(Collectors.toMap(MultipartFile::getOriginalFilename, FileUploadService::getFileContent));
-
-        final List<FileUploadQueueTask> userTasksToExecute = fileUploadQueue
-                .stream()
-                .limit(TOTAL_UPLOAD_RESOURCES)
-                .filter(task -> isTasksMatchingFilesNamesAndUserName(filesNames.keySet(), user, task))
-                .collect(Collectors.toList());
-
-        final List<Future<String>> futureFilesServerNames = uploadPool.invokeAll(userTasksToExecute);
-
-        final List<String> filesServerNames = futureFilesServerNames
-                .stream()
-                .map(FileUploadService::getFuture)
-                .collect(Collectors.toList());
-
-        fileUploadQueue.removeAll(userTasksToExecute);
-
-        return filesServerNames;
     }
 
 
     public List<String> submitForUploadPermission(List<FileMetadata> fileMetadataList) {
 
-        computingService.countUserRequest(fileMetadataList.get(0).getUserName(),fileMetadataList.size());
+        final List<FileUploadQueueTask> notQueuedTasks = new ArrayList<>();
+        fileMetadataList.forEach(e -> notQueuedTasks.add(new FileUploadQueueTask(e, discService)));
 
-        final List<FileUploadQueueTask> notQueuedTasks = fileUploadQueue
+        final List<FileUploadQueueTask> taskToBeQueued = notQueuedTasks
                 .stream()
-                .filter(e -> !fileMetadataList.contains(e.getFileMetadata()))
+                .filter(e -> !fileUploadQueue.contains(e))
                 .collect(Collectors.toList());
 
-        notQueuedTasks.forEach(e -> {
+        taskToBeQueued.forEach(e -> {
+            computingService.countUserRequest(e.getFileMetadata().getUserName());
             e.setPriority(computingService.computePriority(e));
-            uploadPool.submit(e);
+            fileUploadQueue.add(e);
+            System.out.println("UPLOAD - user" + e.getFileMetadata().getUserName() + " submitted to upload file " + e.getFileMetadata().getFileName() + " with priority: " + e.getPriority());
         });
 
-        return fileUploadQueue
+        updateLivingSnapshot();
+
+        final List<String> fileIdsReadyForUpload = livingQueueSnapshot.entrySet()
                 .stream()
-                .limit(TOTAL_UPLOAD_RESOURCES)
-                .filter(task -> fileMetadataList.contains(task.getFileMetadata()))
-                .map(task -> task.getFileMetadata().getFileName())
+                .filter(snapshot -> fileMetadataList.contains(snapshot.getValue().getFileUploadQueueTask().getFileMetadata()))
+                .peek(FileUploadService::logReadyForUploadForRequester)
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
+
+        return fileIdsReadyForUpload;
     }
 
-    private boolean isTasksMatchingFilesNamesAndUserName(Set<String> filesNames, String userName, FileUploadQueueTask element) {
-        return filesNames.contains(element.getFileMetadata().getFileName()) && userName.equals(element.getFileMetadata().getUserName());
+    public List<String> uploadFiles(Map<String, MultipartFile> fileNameWithContent, String user) throws InterruptedException {
+
+        final Map<String, SnapshotContent> filteredLivingQueueSnapshot = livingQueueSnapshot.entrySet().stream()
+                .filter(task -> fileNameWithContent.keySet().contains(task.getKey()))
+                .filter(task -> task.getValue().getFileUploadQueueTask().getFileMetadata().getUserName().equals(user))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        filteredLivingQueueSnapshot.forEach((k,v) ->{
+            try {
+                final MultipartFile multipartFile = fileNameWithContent.get(k);
+                v.getFileUploadQueueTask().getFileMetadata().setFileContent(new String(multipartFile.getBytes()));
+            } catch (IOException e) {
+                System.out.println("empty file stored");
+            }
+        });
+
+        final List<FileUploadQueueTask> userTasksToExecute = filteredLivingQueueSnapshot
+                .entrySet()
+                .stream()
+                .map(e -> e.getValue().getFileUploadQueueTask())
+                .collect(Collectors.toList());
+
+        final List<Future<String>> futureFilesServerNames = uploadPool.invokeAll(userTasksToExecute);
+
+        final List<String> uploadedFilesServerNames = futureFilesServerNames
+                .stream()
+                .map(FileUploadService::getFuture)
+                .collect(Collectors.toList());
+
+        filteredLivingQueueSnapshot.forEach((key, value) -> {
+            livingQueueSnapshot.remove(key);
+            System.out.println("UPLOAD - file " + value.getFileUploadQueueTask().getFileMetadata().getFileName()
+                    + " of user " + value.getFileUploadQueueTask().getFileMetadata().getUserName() + "is uploaded");
+        });
+
+        return uploadedFilesServerNames;
     }
 
     private static String getFuture(Future<String> stringFuture) {
@@ -103,7 +131,35 @@ public class FileUploadService {
         return "";
     }
 
+    private void updateLivingSnapshot() {
 
+        cleanupLivingSnapshot();
 
+        final int freeSnapshotSpace = TOTAL_UPLOAD_RESOURCES - livingQueueSnapshot.size();
+        for (int i = 0; i < freeSnapshotSpace; i++) {
+            final FileUploadQueueTask uploadTask = fileUploadQueue.poll();
+            final String uploadKey = UUID.randomUUID().toString() + uploadTask.getFileMetadata().getFileName();
+            livingQueueSnapshot.put(uploadKey, new SnapshotContent(uploadTask, Instant.now().getEpochSecond()));
+        }
+    }
 
+    private synchronized void cleanupLivingSnapshot() {
+        List<String> outdatedTasks = new ArrayList<>();
+        livingQueueSnapshot.forEach((k, v) -> {
+            final long epochSecond = Instant.now().getEpochSecond();
+            if (epochSecond - v.getTimestamp() > UPLOAD_QUEUE_TIMEOUT_SECONDS) {
+                outdatedTasks.add(k);
+            }
+        });
+        outdatedTasks.forEach(e -> {
+            livingQueueSnapshot.remove(e);
+            System.out.println("UPLOAD - task " + e + " has been removed from queue due to its timeout");
+        });
+    }
+
+    private static void logReadyForUploadForRequester(Map.Entry<String, SnapshotContent> e) {
+        System.out.println("UPLOAD - server is ready for upload file " +
+                e.getValue().getFileUploadQueueTask().getFileMetadata().getFileName() +
+                " of user " + e.getValue().getFileUploadQueueTask().getFileMetadata().getUserName());
+    }
 }
