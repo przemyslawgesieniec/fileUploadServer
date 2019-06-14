@@ -1,4 +1,4 @@
-package com.bp.fileUploadServer.model.Task;
+package com.bp.fileUploadServer.upload;
 
 import com.bp.fileUploadServer.model.FileMetadata;
 import com.bp.fileUploadServer.service.DiscService;

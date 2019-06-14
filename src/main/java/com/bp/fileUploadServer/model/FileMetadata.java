@@ -25,6 +25,13 @@ public class FileMetadata {
         this.fileSize = fileSize;
     }
 
+    public FileMetadata(String userName, Integer fileSize, String serverFileName) {
+        this.serverFileName = serverFileName;
+        this.userName = userName;
+        this.fileSize = fileSize;
+        this.fileName = serverFileName;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

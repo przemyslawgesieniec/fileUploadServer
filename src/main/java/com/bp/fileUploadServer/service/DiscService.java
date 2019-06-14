@@ -29,4 +29,13 @@ public class DiscService {
 
     }
 
+    public FileMetadata download(FileMetadata fileMetadata) {
+
+        return discs.stream()
+                .filter(disc -> disc.hasFile(fileMetadata.getServerFileName()))
+                .findFirst()
+                .map(disc -> disc.download(fileMetadata))
+                .get();
+
+    }
 }

@@ -1,8 +1,8 @@
-package com.bp.fileUploadServer.service;
+package com.bp.fileUploadServer.upload;
 
 import com.bp.fileUploadServer.model.FileMetadata;
-import com.bp.fileUploadServer.model.SnapshotContent;
-import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
+import com.bp.fileUploadServer.service.ComputingService;
+import com.bp.fileUploadServer.service.DiscService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,10 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.stream.Collectors;
 
@@ -27,7 +25,7 @@ public class FileUploadService {
     private static final int TOTAL_UPLOAD_RESOURCES = 5;
     private static final long UPLOAD_QUEUE_TIMEOUT_SECONDS = 8000; //todo change
     private BlockingQueue<FileUploadQueueTask> fileUploadQueue;
-    private Map<String, SnapshotContent> livingQueueSnapshot;
+    private Map<String, UploadSnapshotContent> livingQueueSnapshot;
     private ExecutorService uploadPool;
     private ComputingService computingService;
     private DiscService discService;
@@ -75,7 +73,7 @@ public class FileUploadService {
 
     public List<String> uploadFiles(Map<String, MultipartFile> fileNameWithContent, String user) throws InterruptedException {
 
-        final Map<String, SnapshotContent> filteredLivingQueueSnapshot = livingQueueSnapshot.entrySet().stream()
+        final Map<String, UploadSnapshotContent> filteredLivingQueueSnapshot = livingQueueSnapshot.entrySet().stream()
                 .filter(task -> fileNameWithContent.keySet().contains(task.getKey()))
                 .filter(task -> task.getValue().getFileUploadQueueTask().getFileMetadata().getUserName().equals(user))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -107,25 +105,6 @@ public class FileUploadService {
         return userTasksToExecute.stream().map(e->e.getFileMetadata().getServerFileName()).collect(Collectors.toList());
     }
 
-    private static String getFuture(Future<String> stringFuture) {
-        try {
-            return stringFuture.get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
-
-    private static String getFileContent(MultipartFile file) {
-
-        try {
-            return new String(file.getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
-
     private synchronized void updateLivingSnapshot() {
 
         cleanupLivingSnapshot();
@@ -134,7 +113,7 @@ public class FileUploadService {
             if (fileUploadQueue.size() == 0) break;
             final FileUploadQueueTask uploadTask = fileUploadQueue.poll();
             final String uploadKey = uploadTask.getTaskId() + uploadTask.getFileMetadata().getFileName();
-            livingQueueSnapshot.put(uploadKey, new SnapshotContent(uploadTask, Instant.now().getEpochSecond()));
+            livingQueueSnapshot.put(uploadKey, new UploadSnapshotContent(uploadTask, Instant.now().getEpochSecond()));
         }
 
     }
@@ -153,7 +132,7 @@ public class FileUploadService {
         });
     }
 
-    private static void logReadyForUploadForRequester(Map.Entry<String, SnapshotContent> e) {
+    private static void logReadyForUploadForRequester(Map.Entry<String, UploadSnapshotContent> e) {
         System.out.println("UPLOAD - server is ready for upload file " +
                 e.getValue().getFileUploadQueueTask().getFileMetadata().getFileName() +
                 " of user " + e.getValue().getFileUploadQueueTask().getFileMetadata().getUserName());

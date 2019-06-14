@@ -1,7 +1,8 @@
 package com.bp.fileUploadServer.controller;
 
 import com.bp.fileUploadServer.model.FileMetadata;
-import com.bp.fileUploadServer.service.FileUploadService;
+import com.bp.fileUploadServer.download.FileDownloadService;
+import com.bp.fileUploadServer.upload.FileUploadService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,11 +18,14 @@ import org.springframework.web.multipart.MultipartFile;
 @Controller
 public class FileManagementController {
 
-    FileUploadService fileManageService;
+    private FileUploadService fileManageService;
+    private FileDownloadService fileDownloadService;
 
-    public FileManagementController(FileUploadService fileManageService) {
+    public FileManagementController(FileUploadService fileManageService, FileDownloadService fileDownloadService) {
         this.fileManageService = fileManageService;
+        this.fileDownloadService = fileDownloadService;
     }
+
 
     @PostMapping("/upload")
     public ResponseEntity uploadFiles(@RequestParam("files") List<MultipartFile> files, @RequestParam("user") String user, @RequestParam("serverFilesId") List<String> serverFilesId) throws InterruptedException {
@@ -49,5 +53,17 @@ public class FileManagementController {
         return ResponseEntity.ok(filesKeysReadyForUpload);
     }
 
+    @GetMapping("download")
+    public ResponseEntity requestUploadingFile(@RequestParam("filesNames") List<String> serverFileNames, @RequestParam("user") String user, @RequestParam("filesSizes") List<Integer> sizes) throws InterruptedException {
 
+        List<FileMetadata> fileMetadataList = new ArrayList<>();
+        for (int i = 0; i < serverFileNames.size(); i++) {
+            fileMetadataList.add(new FileMetadata(user, sizes.get(i), serverFileNames.get(i)));
+        }
+
+        final Map<String, String> fileNameFileContentMap = fileDownloadService.downloadFiles(fileMetadataList);
+
+        return ResponseEntity.ok(fileNameFileContentMap);
+
+    }
 }

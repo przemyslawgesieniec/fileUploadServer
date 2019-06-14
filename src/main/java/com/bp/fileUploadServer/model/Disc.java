@@ -88,7 +88,7 @@ public class Disc {
         }
     }
 
-    public synchronized boolean isStoringUserFile(String fileName) {
+    public synchronized boolean hasFile(String fileName) {
 
         try (Stream<String> lines = Files.lines(Paths.get(csvFilePath))) {
             return lines.anyMatch(line -> line.contains(fileName));
@@ -96,5 +96,17 @@ public class Disc {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public FileMetadata download(FileMetadata fileMetadata) {
+
+        try {
+            Thread.sleep(fileMetadata.getFileSize());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        String fileContent = getFileContent(fileMetadata.getServerFileName());
+        fileMetadata.setFileContent(fileContent);
+        return fileMetadata;
     }
 }

@@ -1,6 +1,7 @@
 package com.bp.fileUploadServer.service;
 
-import com.bp.fileUploadServer.model.Task.FileUploadQueueTask;
+import com.bp.fileUploadServer.download.FileDownloadQueueTask;
+import com.bp.fileUploadServer.upload.FileUploadQueueTask;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +19,10 @@ public class ComputingService {
 
     public long computePriority(FileUploadQueueTask fileUploadQueueTask) {
         return (fileUploadQueueTask.getFileMetadata().getFileSize() + Instant.now().getEpochSecond()) * requestCounter.get(fileUploadQueueTask.getFileMetadata().getUserName());
+    }
+
+    public long computePriority(FileDownloadQueueTask fileDownloadQueueTask) {
+        return (fileDownloadQueueTask.getFileMetadata().getFileSize() + Instant.now().getEpochSecond()) * requestCounter.get(fileDownloadQueueTask.getFileMetadata().getUserName());
     }
 
     public void countUserRequest(String userName) {
