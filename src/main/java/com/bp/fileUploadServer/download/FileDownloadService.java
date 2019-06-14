@@ -3,6 +3,9 @@ package com.bp.fileUploadServer.download;
 import com.bp.fileUploadServer.model.FileMetadata;
 import com.bp.fileUploadServer.service.ComputingService;
 import com.bp.fileUploadServer.service.DiscService;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
@@ -125,7 +129,7 @@ public class FileDownloadService {
     }
 
     private static void logReadyForForDownloadForRequester(Map.Entry<String, DownloadSnapshotContent> e) {
-        System.out.println("DOWNLOAD - file is ready to be downloaded" +
+        System.out.println("DOWNLOAD - file is ready to be downloaded: " +
                 e.getValue().getFileDownloadQueueTask().getFileMetadata().getServerFileName() +
                 " of user " + e.getValue().getFileDownloadQueueTask().getFileMetadata().getUserName());
     }

@@ -1,7 +1,8 @@
 package com.bp.fileUploadServer.controller;
 
-import com.bp.fileUploadServer.model.FileMetadata;
 import com.bp.fileUploadServer.download.FileDownloadService;
+import com.bp.fileUploadServer.model.FileMetadata;
+import com.bp.fileUploadServer.service.DiscService;
 import com.bp.fileUploadServer.upload.FileUploadService;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,10 +21,14 @@ public class FileManagementController {
 
     private FileUploadService fileManageService;
     private FileDownloadService fileDownloadService;
+    private DiscService discService;
 
-    public FileManagementController(FileUploadService fileManageService, FileDownloadService fileDownloadService) {
+    public FileManagementController(FileUploadService fileManageService,
+                                    FileDownloadService fileDownloadService,
+                                    DiscService discService) {
         this.fileManageService = fileManageService;
         this.fileDownloadService = fileDownloadService;
+        this.discService = discService;
     }
 
 
@@ -53,8 +58,10 @@ public class FileManagementController {
         return ResponseEntity.ok(filesKeysReadyForUpload);
     }
 
-    @GetMapping("download")
-    public ResponseEntity requestUploadingFile(@RequestParam("filesNames") List<String> serverFileNames, @RequestParam("user") String user, @RequestParam("filesSizes") List<Integer> sizes) throws InterruptedException {
+    @GetMapping("/download")
+    public ResponseEntity requestUploadingFile(@RequestParam("filesNames") List<String> serverFileNames,
+                                               @RequestParam("user") String user,
+                                               @RequestParam("filesSizes") List<Integer> sizes) throws InterruptedException {
 
         List<FileMetadata> fileMetadataList = new ArrayList<>();
         for (int i = 0; i < serverFileNames.size(); i++) {
@@ -65,5 +72,10 @@ public class FileManagementController {
 
         return ResponseEntity.ok(fileNameFileContentMap);
 
+    }
+
+    @GetMapping("/get/filenames")
+    public ResponseEntity requestUploadingFile(@RequestParam("user") String user) {
+        return ResponseEntity.ok(discService.getAllUserFiles(user));
     }
 }

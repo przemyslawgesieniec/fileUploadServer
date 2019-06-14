@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -19,55 +20,46 @@ public class Disc {
 
     private String path;
     private String directoryPath;
-    private String csvFilePath;
+    private String csvMapperPath;
     private int discNumber;
 
     public Disc(int discNumber) {
         this.discNumber = discNumber;
-        directoryPath ="src/main/resources/cluster/disc" + discNumber;
+        directoryPath = "src/main/resources/cluster/disc" + discNumber;
         path = directoryPath + "/";
-        csvFilePath = path + "mapper.csv";
+        csvMapperPath = path + "mapper.csv";
     }
 
     public void save(FileMetadata fileMetadata) throws InterruptedException {
 
-        Thread.sleep(fileMetadata.getFileSize());
+        Thread.sleep(fileMetadata.getFileSize() * 1000);
         saveFile(fileMetadata);
         System.out.println("DISC: file of user: " + fileMetadata.getUserName() + " saved properly");
         updateCsvFile(fileMetadata.getFileName(), fileMetadata.getServerFileName(), fileMetadata.getUserName());
 
     }
 
-//    public UserFileData read(final QueuedUserRequest userRequest) {
-//
-//        stubProcessingTime(userRequest.getFileProcessingTime());
-//        String fileContent = getFileContent(userRequest.getFileName());
-//        System.out.println("DISC: file "+userRequest.getFileName() +" of user: " + userRequest.getUser() + " downloaded properly");
-//        return new UserFileData(userRequest.getFileProcessingTime(), fileContent, userRequest.getFileName());
-//    }
-
-    private String getFileContent(String fileServerName) {
+    private byte[] getFileContent(String fileServerName) {
 
         File directory = new File(directoryPath);
 
-        final String fileContent = String.join("\n", Arrays.stream(Objects.requireNonNull(directory.listFiles()))
+        final byte[] bytesContent = Arrays.stream(Objects.requireNonNull(directory.listFiles()))
                 .filter(file -> file.getName().equals(fileServerName))
                 .findFirst().map(file -> {
                     try {
-                        return Files.readAllLines(Paths.get(file.toURI()));
+                        return Files.readAllBytes(Paths.get(file.toURI()));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                     return null;
                 })
-                .get());
+                .get();
 
-
-        return fileContent;
+        return bytesContent;
     }
 
     private synchronized void updateCsvFile(final String originalFileName, final String serverFileName, final String username) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(csvFilePath, true))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(csvMapperPath, true))) {
             writer.append(serverFileName).append(",").append(username).append(",").append(originalFileName);
             writer.newLine();
         } catch (IOException e) {
@@ -90,7 +82,7 @@ public class Disc {
 
     public synchronized boolean hasFile(String fileName) {
 
-        try (Stream<String> lines = Files.lines(Paths.get(csvFilePath))) {
+        try (Stream<String> lines = Files.lines(Paths.get(csvMapperPath))) {
             return lines.anyMatch(line -> line.contains(fileName));
         } catch (IOException e) {
             e.printStackTrace();
@@ -101,12 +93,13 @@ public class Disc {
     public FileMetadata download(FileMetadata fileMetadata) {
 
         try {
-            Thread.sleep(fileMetadata.getFileSize());
+            Thread.sleep(fileMetadata.getFileSize() * 1000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        String fileContent = getFileContent(fileMetadata.getServerFileName());
+        String fileContent = Base64.getUrlEncoder().encodeToString(getFileContent(fileMetadata.getServerFileName()));
         fileMetadata.setFileContent(fileContent);
         return fileMetadata;
     }
+
 }

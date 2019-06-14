@@ -32,10 +32,9 @@ public class FileUploadQueueTask implements Callable<String> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        FileUploadQueueTask that = (FileUploadQueueTask) o;
-        return Objects.equals(fileMetadata, that.fileMetadata);
+        final boolean equalsNames = ((FileUploadQueueTask) o).getFileMetadata().getUserName().equals(fileMetadata.getUserName());
+        final boolean equalsFileNames = ((FileUploadQueueTask) o).getFileMetadata().getFileName().equals(fileMetadata.getFileName());
+        return equalsNames && equalsFileNames;
     }
 
     @Override

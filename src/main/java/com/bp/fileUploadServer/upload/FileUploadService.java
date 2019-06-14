@@ -47,9 +47,16 @@ public class FileUploadService {
         final List<FileUploadQueueTask> notQueuedTasks = new ArrayList<>();
         fileMetadataList.forEach(e -> notQueuedTasks.add(new FileUploadQueueTask(e, discService)));
 
+        final List<FileUploadQueueTask> tasksOnQueueSnapshot = livingQueueSnapshot
+                .entrySet()
+                .stream()
+                .map(a -> a.getValue().getFileUploadQueueTask())
+                .collect(Collectors.toList());
+
         final List<FileUploadQueueTask> taskToBeQueued = notQueuedTasks
                 .stream()
                 .filter(e -> !fileUploadQueue.contains(e))
+                .filter(e-> !tasksOnQueueSnapshot.contains(e))
                 .collect(Collectors.toList());
 
         taskToBeQueued.forEach(e -> {
